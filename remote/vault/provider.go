@@ -3,8 +3,10 @@ package vault
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/url"
+	"os"
 
 	"emperror.dev/errors"
 	"github.com/hashicorp/vault/api"
@@ -39,9 +41,6 @@ func (p ConfigProvider) Get(rp viper.RemoteProvider) (io.Reader, error) {
 			return nil, errors.WrapIf(err, "failed to parse provider endpoint")
 		}
 
-		query := u.Query()
-		u.RawQuery = ""
-
 		config := api.DefaultConfig()
 		config.Address = u.String()
 		c, err := api.NewClient(config)
@@ -49,7 +48,12 @@ func (p ConfigProvider) Get(rp viper.RemoteProvider) (io.Reader, error) {
 			return nil, errors.WrapIf(err, "failed to create vault api client")
 		}
 
-		c.SetToken(query.Get("token"))
+		token := os.Getenv("VAULT_TOKEN")
+		if len(token) == 0 {
+			return nil, fmt.Errorf("undefined env variable VAULT_TOKEN")
+		}
+
+		c.SetToken(token)
 
 		client = c
 		p.clients[endpoint] = c
@@ -68,7 +72,7 @@ func (p ConfigProvider) Get(rp viper.RemoteProvider) (io.Reader, error) {
 		return nil, errors.Errorf("source: %s errors: %v", rp.Path(), secret.Warnings)
 	}
 
-	b, err := json.Marshal(secret.Data["data"])
+	b, err := json.Marshal(secret.Data)
 	if err != nil {
 		return nil, errors.WrapIf(err, "failed to json encode secret")
 	}
