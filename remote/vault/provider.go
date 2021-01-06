@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"strings"
 
 	"emperror.dev/errors"
 	"github.com/hashicorp/vault/api"
@@ -72,7 +73,9 @@ func (p ConfigProvider) Get(rp viper.RemoteProvider) (io.Reader, error) {
 		return nil, errors.Errorf("source: %s errors: %v", rp.Path(), secret.Warnings)
 	}
 
-	b, err := json.Marshal(secret.Data)
+	nestedMap := toSearchableMap(secret.Data)
+
+	b, err := json.Marshal(nestedMap)
 	if err != nil {
 		return nil, errors.WrapIf(err, "failed to json encode secret")
 	}
@@ -86,4 +89,39 @@ func (p ConfigProvider) Watch(rp viper.RemoteProvider) (io.Reader, error) {
 
 func (p ConfigProvider) WatchChannel(rp viper.RemoteProvider) (<-chan *viper.RemoteResponse, chan bool) {
 	panic("watch channel is not implemented for the vault config provider")
+}
+
+func toSearchableMap(source map[string]interface{}) map[string]interface{} {
+	nestedMap := make(map[string]interface{})
+	for k, v := range source {
+		if !strings.Contains(k, ".") {
+			nestedMap[k] = v
+		} else {
+			parts := strings.Split(k, ".")
+			l := len(parts)
+
+			referencedMap := nestedMap
+			for i, p := range parts {
+				last := l == i+1
+
+				if _, ok := referencedMap[p]; ok {
+					if last {
+						referencedMap[p] = v
+					} else {
+						referencedMap = referencedMap[p].(map[string]interface{})
+					}
+				} else {
+					if last {
+						referencedMap[p] = v
+					} else {
+						referencedMap[p] = make(map[string]interface{})
+						nestedMap = referencedMap
+						referencedMap = referencedMap[p].(map[string]interface{})
+					}
+				}
+			}
+		}
+	}
+
+	return nestedMap
 }

@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"github.com/magiconair/properties/assert"
 	"net/url"
 	"os"
 	"testing"
@@ -77,4 +78,32 @@ func TestConfigProvider(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestToSearchableMap(t *testing.T) {
+	data := map[string]interface{}{
+		"data": map[string]interface{}{
+			"database": map[string]interface{}{
+				"user": "root",
+				"pass": "root",
+			},
+		},
+		"amqp.username": "foo",
+		"amqp.password": "bar",
+	}
+
+	result := toSearchableMap(data)
+
+	assert.Equal(t, result, map[string]interface{}{
+		"data": map[string]interface{}{
+			"database": map[string]interface{}{
+				"user": "root",
+				"pass": "root",
+			},
+		},
+		"amqp": map[string]interface{}{
+			"username": "foo",
+			"password": "bar",
+		},
+	})
 }
