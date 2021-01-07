@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/url"
 	"os"
 	"strings"
@@ -62,14 +63,17 @@ func (p ConfigProvider) Get(rp viper.RemoteProvider) (io.Reader, error) {
 
 	secret, err := client.Logical().Read(rp.Path())
 	if err != nil {
+		log.Printf("failed to read secret - %s", err.Error())
 		return nil, errors.WrapIf(err, "failed to read secret")
 	}
 
 	if secret == nil {
+		log.Printf("source not found: %s", rp.Path())
 		return nil, errors.Errorf("source not found: %s", rp.Path())
 	}
 
 	if secret.Data == nil && secret.Warnings != nil {
+		log.Printf("source: %s errors: %v", rp.Path(), secret.Warnings)
 		return nil, errors.Errorf("source: %s errors: %v", rp.Path(), secret.Warnings)
 	}
 
@@ -77,6 +81,7 @@ func (p ConfigProvider) Get(rp viper.RemoteProvider) (io.Reader, error) {
 
 	b, err := json.Marshal(nestedMap)
 	if err != nil {
+		log.Printf("failed to json encode secret - %s", err)
 		return nil, errors.WrapIf(err, "failed to json encode secret")
 	}
 
